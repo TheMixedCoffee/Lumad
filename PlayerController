@@ -1,0 +1,356 @@
+using UnityEngine;
+using System.Collections;
+
+public class PlayerController : MonoBehaviour
+{
+
+
+    public float moveSpeed;
+    public float jumpHeight;
+    public Transform groundCheck;
+    public float groundCheckRadius;
+    public LayerMask whatIsGround;
+    private bool grounded;
+    private bool doubleJumped;
+    private Animator anim;
+    private float moveVelocity;
+
+    public Transform firePoint;
+    public GameObject bRanged;
+
+    public float shotDelay;
+    private float shotDelayCounter;
+
+    public int powerJumpDamage;
+    private bool powerJumpLimit;
+
+    public float knockback;
+    public float knockbackLength;
+    public float knockbackCount;
+    public bool knockFromRight;
+
+    public int depleteBRanged;
+    private bool rapidBRanged;
+    private bool attacking;
+    private bool bRangedLong;
+    public AudioSource jumpSFX;
+    public AudioSource swordSFX;
+    public AudioSource dashSFX;
+
+    private bool facingRight;
+    private float gravityStore;
+    private PlayerController player;
+
+    public int dashLength;
+    public bool dashAble;
+    public bool isDashing;
+    public int dashDeplete;
+    public int stabLength;
+
+
+    // Use this for initialization
+
+    public int noOfClicks = 0;
+
+    //Time when last button was clicked
+    float lastClickedTime = 0;
+    //Delay between clicks for which clicks will be considered as combo
+    float maxComboDelay = 1;
+    void Start()
+    {
+        anim = GetComponent<Animator>();
+        player = FindObjectOfType<PlayerController>();
+    }
+
+    void Awake()
+    {
+        QualitySettings.vSyncCount = 0;  // VSync must be disabled
+        Application.targetFrameRate = 30;
+    }
+
+    void FixedUpdate()
+    {
+        grounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, whatIsGround);
+
+
+        //  if (sword2 && facingRight)
+        //  {
+        //       GetComponent<Rigidbody2D>().AddForce(new Vector2(stabLength * Time.fixedDeltaTime, 0));
+        //  }
+
+        //  if (sword2 && !facingRight)
+        //   {
+        //
+        //    GetComponent<Rigidbody2D>().AddForce(new Vector2(-stabLength * Time.fixedDeltaTime, 0));
+        //  }
+
+    }
+    // Update is called once per frame
+    void Update()
+    {
+
+        {
+            if (Time.time - lastClickedTime > maxComboDelay)
+            {
+                noOfClicks = 0;
+            }
+        }
+        if (grounded)
+            doubleJumped = false;
+
+        anim.SetBool("Grounded", grounded);
+
+        if (Input.GetButtonDown("Jump") && grounded)
+        {
+            //GetComponent<Rigidbody2D>().velocity = new Vector2(GetComponent<Rigidbody2D>().velocity.x, jumpHeight);
+            Jump();
+            jumpSFX.Play();
+
+        }
+        if (Input.GetButtonDown("Jump") && !doubleJumped && !grounded)
+        {
+            //GetComponent<Rigidbody2D>().velocity = new Vector2(GetComponent<Rigidbody2D>().velocity.x, jumpHeight);
+            Jump();
+            doubleJumped = true;
+            jumpSFX.Play();
+        }
+
+
+        if (Input.GetKeyDown(KeyCode.LeftShift) && grounded && !powerJumpLimit)
+        {
+            GetComponent<Rigidbody2D>().velocity = new Vector2(GetComponent<Rigidbody2D>().velocity.x, jumpHeight * 2);
+            BloodlustManager.DepleteBlood(powerJumpDamage);
+
+
+        }
+
+        if (BloodlustManager.playerBloodlust <= 0)
+        {
+            powerJumpLimit = true;
+        }
+        else
+        {
+            powerJumpLimit = false;
+        }
+
+        //moveVelocity = 0f;
+
+        moveVelocity = moveSpeed * Input.GetAxisRaw("Horizontal");
+
+
+
+        if (knockbackCount <= 0)
+        {
+            GetComponent<Rigidbody2D>().velocity = new Vector2(moveVelocity, GetComponent<Rigidbody2D>().velocity.y);
+        }
+        else
+        {
+            if (knockFromRight)
+                GetComponent<Rigidbody2D>().velocity = new Vector2(-knockback, knockback / 2);
+            if (!knockFromRight)
+                GetComponent<Rigidbody2D>().velocity = new Vector2(knockback, knockback / 2);
+            knockbackCount -= Time.deltaTime;
+
+        }
+
+        anim.SetFloat("Speed", Mathf.Abs(GetComponent<Rigidbody2D>().velocity.x));
+
+        if (GetComponent<Rigidbody2D>().velocity.x > 0)
+            transform.localScale = new Vector3(1f, 1f, 1f);
+        else if (GetComponent<Rigidbody2D>().velocity.x < 0)
+            transform.localScale = new Vector3(-1f, 1f, 1f);
+
+        if (anim.GetBool("bRanged"))
+        {
+            anim.SetBool("bRanged", false);
+        }
+
+        if (Input.GetButtonDown("Fire2") && !rapidBRanged && grounded)
+        {
+            {
+                BloodlustManager.DepleteBlood(depleteBRanged);
+                anim.SetBool("bRanged", true);
+                GetComponent<Rigidbody2D>().velocity = new Vector2(0 * moveVelocity, 0 * GetComponent<Rigidbody2D>().velocity.y);
+                anim.SetFloat("Speed", Mathf.Abs(GetComponent<Rigidbody2D>().velocity.x));
+                Instantiate(bRanged, firePoint.position, firePoint.rotation);
+            }
+        }
+
+        if (BloodlustManager.playerBloodlust <= 10)
+        {
+            rapidBRanged = true;
+        }
+        else
+        {
+            rapidBRanged = false;
+        }
+
+
+        if (Input.GetButton("Fire2") && grounded && !isDashing)
+        {
+            shotDelayCounter -= Time.deltaTime;
+            anim.SetBool("bRanged", true);
+            bRangedLong = true;
+            GetComponent<Rigidbody2D>().velocity = new Vector2(0 * moveVelocity, 0 * GetComponent<Rigidbody2D>().velocity.y);
+            anim.SetFloat("Speed", Mathf.Abs(GetComponent<Rigidbody2D>().velocity.x));
+
+            if (shotDelayCounter <= 0)
+            {
+                shotDelayCounter = shotDelay;
+                Instantiate(bRanged, firePoint.position, firePoint.rotation);
+                bRangedLong = false;
+            }
+
+            if (bRangedLong = false && shotDelayCounter != 0)
+            {
+                shotDelayCounter = 0;
+            }
+        }
+ 
+
+        if (Input.GetButtonDown("Fire1") && grounded && !isDashing)
+        {
+            OnClick();
+            
+        }
+
+
+        if (anim.GetBool("brJump"))
+        {
+            anim.SetBool("brJump", false);
+        }
+
+        if (anim.GetBool("JumpSword"))
+        {
+            anim.SetBool("JumpSword", false);
+        }
+
+        if (moveSpeed == moveVelocity)
+        {
+            facingRight = true;
+        }
+
+        if (moveSpeed == -moveVelocity)
+        {
+            facingRight = false;
+        }
+
+        if (anim.GetBool("Dash"))
+        {
+            anim.SetBool("Dash", false);
+            isDashing = false;
+        }
+
+
+
+
+        if (Input.GetKeyDown(KeyCode.M) && dashAble)
+        {
+            isDashing = true;
+            Debug.Log("Player is dashing");
+            anim.SetBool("Dash", true);
+            BloodlustManager.DepleteBlood(dashDeplete);
+            swordSFX.Play();
+
+        }
+
+        if (isDashing && facingRight)
+        {
+
+            GetComponent<Rigidbody2D>().velocity = new Vector2(dashLength, 0);
+            Debug.Log("Woo");
+        }
+
+        if (isDashing && !facingRight)
+        {
+
+            GetComponent<Rigidbody2D>().velocity = new Vector2(-dashLength, 0);
+        }
+
+
+
+        if (BloodlustManager.playerBloodlust <= 10)
+        {
+            dashAble = false;
+        }
+        if (BloodlustManager.playerBloodlust > 10)
+        {
+            dashAble = true;
+        }
+
+        if (Input.GetButton("Fire1") && !grounded && !isDashing)
+        {
+            anim.SetBool("JumpSword", true);
+            swordSFX.Play();
+        }
+
+        if (Input.GetButton("Fire2") && !grounded && !isDashing)
+        {
+            anim.SetBool("brJump", true);
+            GetComponent<Rigidbody2D>().velocity = new Vector2(0 * moveVelocity, GetComponent<Rigidbody2D>().velocity.y);
+        }
+
+
+    }
+    public void Jump()
+    {
+        GetComponent<Rigidbody2D>().velocity = new Vector2(GetComponent<Rigidbody2D>().velocity.x, jumpHeight);
+    }
+    void OnClick()
+    {
+        //Record time of last button click
+        lastClickedTime = Time.time;
+        noOfClicks++;
+        if (noOfClicks == 1)
+        {
+            anim.SetBool("Attack1", true);
+            Attack1();
+        }
+        if (noOfClicks == 2)
+        {
+            anim.SetBool("Attack2", true);
+            Attack2();
+        }
+        if (noOfClicks == 3)
+        {
+            anim.SetBool("Attack3", true);
+            Attack3();
+        }
+        //limit/clamp no of clicks between 0 and 3 because you have combo for 3 clicks
+        noOfClicks = Mathf.Clamp(noOfClicks, 0, 3);
+
+    }
+
+
+    public void Attack1()
+    {
+        GetComponent<Rigidbody2D>().velocity = new Vector2(0 * moveVelocity, 0 * GetComponent<Rigidbody2D>().velocity.y);
+        anim.SetFloat("Speed", Mathf.Abs(GetComponent<Rigidbody2D>().velocity.x));
+        swordSFX.Play();
+        anim.SetBool("Attack1", false);
+    }
+
+    public void Attack2()
+    {
+        if (facingRight)
+            {
+            GetComponent<Rigidbody2D>().velocity = new Vector2(stabLength, 0 * GetComponent<Rigidbody2D>().velocity.y);
+        }
+        else
+        {
+            GetComponent<Rigidbody2D>().velocity = new Vector2(-stabLength, 0 * GetComponent<Rigidbody2D>().velocity.y);
+        }
+        anim.SetFloat("Speed", Mathf.Abs(GetComponent<Rigidbody2D>().velocity.x));
+        swordSFX.Play();
+        anim.SetBool("Attack2", false);
+    }
+
+    public void Attack3()
+    {
+        GetComponent<Rigidbody2D>().velocity = new Vector2(0 * moveVelocity, 0 * GetComponent<Rigidbody2D>().velocity.y);
+        anim.SetFloat("Speed", Mathf.Abs(GetComponent<Rigidbody2D>().velocity.x));
+        swordSFX.Play();
+        anim.SetBool("Attack3", false);
+    }
+
+}
